@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ai-berkshire",
+  "description": "价值投资研究 Skill 合集（巴菲特/芒格/段永平/李录四大师框架）",
+  "owner": {
+    "name": "xbtlin",
+    "url": "https://github.com/icestone1990/ai-berkshire-plugin"
+  },
+  "plugins": [
+    {
+      "name": "ai-berkshire",
+      "description": "价值投资研究 Skill 合集：巴菲特/芒格/段永平/李录四大师框架，覆盖选股筛选、深度研究、财报精读、组合管理、供应链瓶颈套利的完整投研工作流",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

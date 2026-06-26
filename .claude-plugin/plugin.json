@@ -1,0 +1,21 @@
+{
+  "name": "ai-berkshire",
+  "version": "1.0.0",
+  "description": "价值投资研究 Skill 合集：巴菲特/芒格/段永平/李录四大师框架，覆盖选股筛选、深度研究、财报精读、组合管理、供应链瓶颈套利的完整投研工作流",
+  "author": {
+    "name": "xbtlin",
+    "url": "https://github.com/icestone1990/ai-berkshire-plugin"
+  },
+  "homepage": "https://github.com/icestone1990/ai-berkshire-plugin",
+  "repository": "https://github.com/icestone1990/ai-berkshire-plugin",
+  "license": "MIT",
+  "keywords": [
+    "value-investing",
+    "buffett",
+    "munger",
+    "li-lu",
+    "duan-yongping",
+    "equity-research",
+    "financial-analysis"
+  ]
+}
