@@ -96,6 +96,29 @@ description: "本 skill 用于涉及企业财务数据的研究、需要确定�
 
 ---
 
+## 程序化数据工具（优先于抓网站）
+
+A 股、美股的很多数据可直接用 plugin 工具取（API 实时，比 WebFetch 抓网站更准更快），**优先使用**：
+
+### A 股实时数据 — `tools/ashare_data.py`
+腾讯行情 + 东方财富财报，零依赖、API 实时。**研究 A 股标的时优先用它，而不是抓东方财富网页。**
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py quote 300866        # 实时行情：价/市值/PE/PB/52周
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py financials 300866   # 近5年核心财务：营收/增速/ROE
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py valuation 300866    # 估值指标 + 市值验算
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py search 安克创新     # 按公司名搜股票代码
+```
+
+### 美股公允价值 — `tools/morningstar_fair_value.py`
+从 Morningstar 取分析师公允价值（API 实时，偶尔不稳定，失败则回退 macrotrends）。
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/morningstar_fair_value.py --help   # 查参数
+```
+
+---
+
 ## 快速索引
 
 | 场景 | 主要来源 | 备用来源 |

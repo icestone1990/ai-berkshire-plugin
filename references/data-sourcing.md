@@ -27,6 +27,17 @@
 
 融资轮次（Crunchbase / IT 桔子）+ 可比上市公司 + 行业报告，多源拼凑。
 
+## 程序化数据获取（优先于抓网站）
+
+A 股价格/财报等可直接用工具取（API 实时），不必 WebFetch 抓网站：
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py quote 300866        # A股实时行情（价/市值/PE/PB）
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py financials 300866   # A股近5年财务（营收/ROE）
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/ashare_data.py search 关键词       # 按名搜代码
+python3 ${CLAUDE_PLUGIN_ROOT}/tools/morningstar_fair_value.py --help   # 美股公允价值（Morningstar）
+```
+
 ## 程序化校验（必做）
 
 关键财务数据收集后，**必须**调用 `${CLAUDE_PLUGIN_ROOT}/tools/financial_rigor.py` 验算，杜绝 LLM 心算误差：
