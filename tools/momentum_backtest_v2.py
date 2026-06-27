@@ -17,56 +17,6 @@ from datetime import datetime
 from collections import OrderedDict
 
 # ============================================================
-# 手工基本面数据（作 label 参考 + AV 失败时的 fallback）
-# ============================================================
-
-MANUAL_FUNDAMENTALS = {
-    "NVDA": {
-        "name": "英伟达",
-        "quarters": OrderedDict([
-            ("2022-08-24", {"rev": 67.0, "rev_yoy": -4.0, "gm": 43.5, "eps_beat": -24.0}),
-            ("2022-11-16", {"rev": 59.3, "rev_yoy": -17.0, "gm": 53.6, "eps_beat": 7.4}),
-            ("2023-02-22", {"rev": 60.5, "rev_yoy": -21.0, "gm": 63.3, "eps_beat": 10.0}),
-            ("2023-05-24", {"rev": 71.9, "rev_yoy": -13.0, "gm": 64.6, "eps_beat": 18.5}),
-            ("2023-08-23", {"rev": 135.1, "rev_yoy": 101.0, "gm": 70.1, "eps_beat": 29.0}),
-            ("2023-11-21", {"rev": 181.2, "rev_yoy": 206.0, "gm": 74.0, "eps_beat": 19.0}),
-            ("2024-02-21", {"rev": 221.0, "rev_yoy": 265.0, "gm": 76.0, "eps_beat": 12.0}),
-            ("2024-05-22", {"rev": 260.4, "rev_yoy": 262.0, "gm": 78.4, "eps_beat": 9.0}),
-        ]),
-    },
-    "AMD": {
-        "name": "AMD",
-        "quarters": OrderedDict([
-            ("2022-08-02", {"rev": 65.5, "rev_yoy": 70.0, "gm": 46.0, "eps_beat": 5.0}),
-            ("2022-11-01", {"rev": 55.7, "rev_yoy": 29.0, "gm": 42.0, "eps_beat": 2.3}),
-            ("2023-01-31", {"rev": 55.0, "rev_yoy": 16.0, "gm": 43.0, "eps_beat": 6.2}),
-            ("2023-05-02", {"rev": 53.5, "rev_yoy": -9.0, "gm": 44.0, "eps_beat": 7.1}),
-            ("2023-08-01", {"rev": 54.0, "rev_yoy": -18.0, "gm": 46.0, "eps_beat": 1.8}),
-            ("2023-10-31", {"rev": 58.0, "rev_yoy": 4.0, "gm": 47.0, "eps_beat": 6.1}),
-            ("2024-01-30", {"rev": 61.7, "rev_yoy": 10.0, "gm": 47.0, "eps_beat": 3.7}),
-            ("2024-04-30", {"rev": 54.7, "rev_yoy": 2.0, "gm": 47.0, "eps_beat": 3.3}),
-            ("2024-07-30", {"rev": 58.3, "rev_yoy": 9.0, "gm": 49.0, "eps_beat": 1.5}),
-            ("2024-10-29", {"rev": 68.2, "rev_yoy": 18.0, "gm": 50.0, "eps_beat": 4.5}),
-        ]),
-    },
-    "MU": {
-        "name": "美光科技",
-        "quarters": OrderedDict([
-            ("2022-09-29", {"rev": 66.4, "rev_yoy": -20.0, "gm": 40.0, "eps_beat": -5.0}),
-            ("2022-12-21", {"rev": 40.9, "rev_yoy": -47.0, "gm": 22.0, "eps_beat": 22.0}),
-            ("2023-03-28", {"rev": 36.9, "rev_yoy": -53.0, "gm": 11.0, "eps_beat": 5.0}),
-            ("2023-06-28", {"rev": 37.5, "rev_yoy": -57.0, "gm": -8.0, "eps_beat": 15.0}),
-            ("2023-09-27", {"rev": 40.1, "rev_yoy": -40.0, "gm": -1.0, "eps_beat": 18.0}),
-            ("2023-12-20", {"rev": 47.3, "rev_yoy": 16.0, "gm": 20.0, "eps_beat": 68.0}),
-            ("2024-03-20", {"rev": 58.2, "rev_yoy": 58.0, "gm": 28.0, "eps_beat": 82.0}),
-            ("2024-06-26", {"rev": 68.1, "rev_yoy": 82.0, "gm": 35.4, "eps_beat": 6.9}),
-            ("2024-09-25", {"rev": 77.5, "rev_yoy": 93.0, "gm": 36.5, "eps_beat": 5.4}),
-        ]),
-    },
-}
-
-
-# ============================================================
 # Alpha Vantage 实时基本面（替代手工录入；2024→实时）
 # key 从环境变量 ALPHAVANTAGE_API_KEY 读，缓存 1 天，失败回退手工字典
 # ============================================================
@@ -172,7 +122,7 @@ def fetch_fundamentals_av(ticker):
         }
 
     result = {
-        "name": MANUAL_FUNDAMENTALS.get(ticker, {}).get("name", ticker),
+        "name": ticker,
         "quarters": quarters,
     }
     cache[ticker] = {"_ts": time.time(), "data": result}
@@ -181,18 +131,8 @@ def fetch_fundamentals_av(ticker):
 
 
 def get_fundamentals(ticker):
-    """统一入口：AV 实时（缓存）优先，失败回退手工字典。"""
-    try:
-        return fetch_fundamentals_av(ticker)
-    except Exception as e:
-        print(f"  [WARN] AV 取数失败({e})，回退手工字典", file=sys.stderr)
-        m = MANUAL_FUNDAMENTALS[ticker]
-        quarters = OrderedDict()
-        for d, q in m["quarters"].items():
-            q2 = dict(q)
-            q2["label"] = _auto_label(d, q["rev_yoy"], q["gm"], q["eps_beat"])
-            quarters[d] = q2
-        return {"name": m["name"], "quarters": quarters}
+    """统一入口：AV 实时（缓存），失败抛错（无人工 fallback）。"""
+    return fetch_fundamentals_av(ticker)
 
 
 # ============================================================
