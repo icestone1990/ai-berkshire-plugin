@@ -11,14 +11,16 @@ AMD/MU：从JSON文件加载真实日线数据
 import json
 import sys
 import os
+import time
+import subprocess
 from datetime import datetime
 from collections import OrderedDict
 
 # ============================================================
-# 基本面数据（手工录入，比API更准确）
+# 手工基本面数据（作 label 参考 + AV 失败时的 fallback）
 # ============================================================
 
-FUNDAMENTALS = {
+MANUAL_FUNDAMENTALS = {
     "NVDA": {
         "name": "英伟达",
         "quarters": OrderedDict([
@@ -62,6 +64,124 @@ FUNDAMENTALS = {
         ]),
     },
 }
+
+
+# ============================================================
+# Alpha Vantage 实时基本面（替代手工录入；2024→实时）
+# key 从环境变量 ALPHAVANTAGE_API_KEY 读，缓存 1 天，失败回退手工字典
+# ============================================================
+
+AV_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "data", "fundamentals_av.json"
+)
+AV_CACHE_TTL = 86400  # 1 天
+
+
+def _av_key():
+    k = os.environ.get("ALPHAVANTAGE_API_KEY")
+    if not k:
+        raise RuntimeError("未设置环境变量 ALPHAVANTAGE_API_KEY")
+    return k
+
+
+def _av_get(function, symbol):
+    """curl 直连 Alpha Vantage（绕代理）；调用方负责限流 sleep。"""
+    url = (
+        f"https://www.alphavantage.co/query?function={function}"
+        f"&symbol={symbol}&apikey={_av_key()}"
+    )
+    r = subprocess.run(
+        ["/usr/bin/curl", "-s", "--noproxy", "*", url],
+        capture_output=True, timeout=20,
+    )
+    data = json.loads(r.stdout)
+    if "Information" in data or "Note" in data:
+        raise RuntimeError(f"AV 限流/无效: {data.get('Information') or data.get('Note')}")
+    return data
+
+
+def _load_av_cache():
+    if os.path.exists(AV_CACHE_FILE):
+        try:
+            return json.load(open(AV_CACHE_FILE))
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_av_cache(c):
+    os.makedirs(os.path.dirname(AV_CACHE_FILE), exist_ok=True)
+    json.dump(c, open(AV_CACHE_FILE, "w"), ensure_ascii=False, indent=2)
+
+
+def fetch_fundamentals_av(ticker):
+    """从 Alpha Vantage 实时取逐季基本面，缓存 1 天。
+    返回 {name, quarters: OrderedDict[date -> {rev, rev_yoy, gm, eps_beat, label}]}
+    rev 单位亿美元；rev_yoy/gm/eps_beat 为 %。
+    """
+    cache = _load_av_cache()
+    cached = cache.get(ticker)
+    if cached and (time.time() - cached.get("_ts", 0) < AV_CACHE_TTL):
+        return cached["data"]
+
+    # EARNINGS → eps_beat（surprisePercentage）
+    time.sleep(12)  # 免费 key 5 req/min
+    earn = _av_get("EARNINGS", ticker)
+    eps_by_date = {}
+    for e in earn.get("quarterlyEarnings", []):
+        d = e.get("fiscalDateEnding")
+        try:
+            eps_by_date[d] = float(e.get("surprisePercentage") or 0)
+        except (TypeError, ValueError):
+            eps_by_date[d] = 0.0
+
+    # INCOME_STATEMENT → rev / gm
+    time.sleep(12)
+    inc = _av_get("INCOME_STATEMENT", ticker)
+    rev_list = []
+    for r in inc.get("quarterlyReports", []):
+        d = r.get("fiscalDateEnding")
+        rev = r.get("totalRevenue")
+        gp = r.get("grossProfit")
+        if rev and gp:
+            try:
+                rev_list.append((d, float(rev) / 1e8, float(gp) / float(rev) * 100))
+            except (TypeError, ValueError, ZeroDivisionError):
+                continue
+    rev_list.sort(key=lambda x: x[0])  # 时间正序
+
+    # 合并 + rev_yoy（同季去年 = index-4）
+    quarters = OrderedDict()
+    for i, (d, rev, gm) in enumerate(rev_list):
+        rev_yoy = 0.0
+        if i >= 4 and rev_list[i - 4][1]:
+            rev_yoy = (rev / rev_list[i - 4][1] - 1) * 100
+        eps_beat = eps_by_date.get(d, 0.0)
+        label = f"{d[:7]} rev{rev_yoy:+.0f}% gm{gm:.0f}% eps{eps_beat:+.0f}%"
+        quarters[d] = {
+            "rev": round(rev, 1),
+            "rev_yoy": round(rev_yoy, 1),
+            "gm": round(gm, 1),
+            "eps_beat": round(eps_beat, 1),
+            "label": label,
+        }
+
+    result = {
+        "name": MANUAL_FUNDAMENTALS.get(ticker, {}).get("name", ticker),
+        "quarters": quarters,
+    }
+    cache[ticker] = {"_ts": time.time(), "data": result}
+    _save_av_cache(cache)
+    return result
+
+
+def get_fundamentals(ticker):
+    """统一入口：AV 实时（缓存）优先，失败回退手工字典。"""
+    try:
+        return fetch_fundamentals_av(ticker)
+    except Exception as e:
+        print(f"  [WARN] AV 取数失败({e})，回退手工字典", file=sys.stderr)
+        return MANUAL_FUNDAMENTALS[ticker]
 
 
 # ============================================================
@@ -117,7 +237,7 @@ def scan_momentum(prices):
 # ============================================================
 
 def find_fund(ticker, date):
-    quarters = list(FUNDAMENTALS[ticker]["quarters"].items())
+    quarters = list(get_fundamentals(ticker)["quarters"].items())
     latest = None
     prev = None
     for idx, (qd, qf) in enumerate(quarters):
@@ -164,7 +284,7 @@ def verify(fund, prev_fund):
 # ============================================================
 
 def backtest(ticker, prices):
-    name = FUNDAMENTALS[ticker]["name"]
+    name = get_fundamentals(ticker)["name"]
     print(f"\n{'='*70}")
     print(f"  {name} ({ticker}) 回测")
     print(f"{'='*70}")
